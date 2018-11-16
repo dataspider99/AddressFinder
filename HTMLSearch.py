@@ -1,14 +1,21 @@
 from lxml import html
 import io
 import re
-from requests import Session
+import requests
 import sys
+from requests.exceptions import SSLError
 
-session = Session()
+class BlankResponse(Exception):
+    pass
+
 xml_tag = re.compile(r'<\?xml[^?]+\?>')
  
 class HTMLSearch(object):
-    tree2 = ""
+    """
+    Xpath Search Logic Class
+    """
+    tree2 = ""  
+    respone_html = None
     priority_key_list = ['class','rel','itemprop','alt','title','data-url','id']
     
     def __init__(self,html_path=None,url=None,html_string=None):
@@ -21,7 +28,15 @@ class HTMLSearch(object):
         else:
             raise Exception("Please specify at least one input")
         fil = xml_tag.sub("",fil)
-        self.tree2 = html.fromstring(fil) 
+        if fil:
+            self.update_response(fil)
+        else:
+            raise BlankResponse("Got no text in response")
+         
+    def update_response(self,response):
+        fil = xml_tag.sub("",response)
+        self.tree2 = html.fromstring(fil)
+        self.respone_html = fil
         
     def get_xpath_page(self):
         pass
@@ -300,14 +315,17 @@ class HTMLSearch(object):
             detailed_urls.append(info)
         return detailed_urls
     
-    def process_url(self,url,headers={'User-Agent':'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36'}):
-        
-        response = session.get(url,headers = headers)
-        if response.status_code == 200:
+    def process_url(self,url,headers={"User-Agent":"Mozilla/5.0(X11;Ubuntu;Linuxx86_64;rv: 62.0)Gecko/20100101Firefox/62.0","Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8","Accept-Language":"en-US,en;q=0.5","Accept-Encoding":"gzip,deflate"}):
+        self.domain = self.domain_finder(url)
+        try:
+            response = requests.get(url,headers=headers)
+        except SSLError:
+            response = requests.get(url,headers=headers,verify=False)
+        if response.status_code in [200,201,301,302]:
             return response.text
         else:
-            raise Exception(str(response.status_code)+" Response code from url")
-    
+            print(str(response.status_code)+" Response code from :"+url)
+            return "<html><head></head><body></body></html>"
      
     def get_keywords_html(self,filePath,recommended_keywords):       
         with io.open("input.html","r",encoding="utf-8") as f:
@@ -319,8 +337,8 @@ class HTMLSearch(object):
     def start_key_word_finder(self,file_html,url=''):
         tree2 = html.fromstring(file_html)
         self.tree2 = tree2
-        recommend_list = self.recommend_list_keyword = map(str.upper,self.recommend_list_keyword)
-        black_list = self.blacklisted_keywords = map(str.upper,self.blacklisted_keywords)
+        self.recommend_list_keyword = map(str.upper,self.recommend_list_keyword)
+        self.blacklisted_keywords = map(str.upper,self.blacklisted_keywords)
         
         
         
@@ -339,6 +357,3 @@ class HTMLSearch(object):
         xpaths2 = self.get_new_xpaths(node_infos)
         words = self.get_the_matches(xpaths2)
         return list(words)
-        
-        
-        #= print self.black_list_filter(keywords['list2'])            

@@ -1,5 +1,4 @@
 from HTMLSearch import HTMLSearch
-from numpy.core.defchararray import endswith
 
 class XpathSearch(HTMLSearch):
     train_data = {}
